@@ -62,10 +62,12 @@ func TestQueries(t *testing.T) {
 			expectedCols:   allAttrs,
 			queryTree: &qexec.MemScanNode{
 				Src: inMemMovies,
-				Qual: &qexec.Qualifier{
-					Field: "id",
-					Type:  qexec.QualEql,
-					Value: 3,
+				Expr: &qexec.Expression{
+					Qual: &qexec.Qualifier{
+						Field: "id",
+						Type:  qexec.QualEql,
+						Value: 3,
+					},
 				},
 			},
 		},
@@ -77,10 +79,12 @@ func TestQueries(t *testing.T) {
 				Limit: 2,
 				Child: &qexec.MemScanNode{
 					Src: inMemMovies,
-					Qual: &qexec.Qualifier{
-						Field: "genre",
-						Type:  qexec.QualEql,
-						Value: "sci-fi",
+					Expr: &qexec.Expression{
+						Qual: &qexec.Qualifier{
+							Field: "genre",
+							Type:  qexec.QualEql,
+							Value: "sci-fi",
+						},
 					},
 				},
 			},
@@ -123,10 +127,12 @@ func TestQueries(t *testing.T) {
 					Dir:   qexec.SortAsc,
 					Child: &qexec.MemScanNode{
 						Src: inMemMovies,
-						Qual: &qexec.Qualifier{
-							Field: "genre",
-							Type:  qexec.QualEql,
-							Value: "sci-fi",
+						Expr: &qexec.Expression{
+							Qual: &qexec.Qualifier{
+								Field: "genre",
+								Type:  qexec.QualEql,
+								Value: "sci-fi",
+							},
 						},
 					},
 				},
@@ -233,10 +239,114 @@ func TestQueries(t *testing.T) {
 				Field: "id",
 				Child: &qexec.MemScanNode{
 					Src: inMemMovies,
-					Qual: &qexec.Qualifier{
-						Field: "genre",
-						Type:  qexec.QualEql,
-						Value: "sci-fi",
+					Expr: &qexec.Expression{
+						Qual: &qexec.Qualifier{
+							Field: "genre",
+							Type:  qexec.QualEql,
+							Value: "sci-fi",
+						},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT name FROM movies WHERE genre = 'sci-fi' AND id = 6`,
+			expectedTuples: 1,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"name": "Alien"},
+			},
+			queryTree: &qexec.MemScanNode{
+				Src: inMemMovies,
+				Proj: qexec.Projection{
+					{"name", ""},
+				},
+				Expr: &qexec.Expression{
+					Type: qexec.ExprAnd,
+					Left: &qexec.Expression{
+						Qual: &qexec.Qualifier{
+							Field: "genre",
+							Type:  qexec.QualEql,
+							Value: "sci-fi",
+						},
+					},
+					Right: &qexec.Expression{
+						Qual: &qexec.Qualifier{
+							Field: "id",
+							Type:  qexec.QualEql,
+							Value: 6,
+						},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT count(id) FROM movies WHERE genre = 'sci-fi' OR genre = 'western'`,
+			expectedTuples: 1,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"count(id)": 4},
+			},
+			queryTree: &qexec.AggNode{
+				Type:  qexec.AggCount,
+				Field: "id",
+				Child: &qexec.MemScanNode{
+					Src: inMemMovies,
+					Expr: &qexec.Expression{
+						Type: qexec.ExprOr,
+						Left: &qexec.Expression{
+							Qual: &qexec.Qualifier{
+								Field: "genre",
+								Type:  qexec.QualEql,
+								Value: "sci-fi",
+							},
+						},
+						Right: &qexec.Expression{
+							Qual: &qexec.Qualifier{
+								Field: "genre",
+								Type:  qexec.QualEql,
+								Value: "western",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT name FROM movies WHERE id = 1 OR (genre = 'sci-fi' AND id = 4)`,
+			expectedTuples: 2,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"name": "Cool Hand Luke"},
+				map[string]interface{}{"name": "Star Wars"},
+			},
+			queryTree: &qexec.MemScanNode{
+				Src: inMemMovies,
+				Proj: qexec.Projection{
+					{"name", ""},
+				},
+				Expr: &qexec.Expression{
+					Type: qexec.ExprOr,
+					Left: &qexec.Expression{
+						Qual: &qexec.Qualifier{
+							Field: "id",
+							Type:  qexec.QualEql,
+							Value: 1,
+						},
+					},
+					Right: &qexec.Expression{
+						Type: qexec.ExprAnd,
+						Left: &qexec.Expression{
+							Qual: &qexec.Qualifier{
+								Field: "genre",
+								Type:  qexec.QualEql,
+								Value: "sci-fi",
+							},
+						},
+						Right: &qexec.Expression{
+							Qual: &qexec.Qualifier{
+								Field: "id",
+								Type:  qexec.QualEql,
+								Value: 4,
+							},
+						},
 					},
 				},
 			},

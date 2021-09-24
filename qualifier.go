@@ -3,7 +3,7 @@ package qexec
 type QualType int
 
 const (
-	QualEql = iota
+	QualEql QualType = iota
 )
 
 type Qualifier struct {

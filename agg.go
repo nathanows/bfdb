@@ -61,5 +61,5 @@ func (n *AggNode) Next() Tuple {
 	default:
 	}
 
-	return ExecProject(rt, n.Proj)
+	return n.Proj.Exec(rt)
 }

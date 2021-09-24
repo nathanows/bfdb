@@ -6,7 +6,7 @@ import (
 
 type MemScanNode struct {
 	Src  []interface{}
-	Qual *Qualifier
+	Expr *Expression
 	Proj Projection
 
 	currIdx int
@@ -23,13 +23,14 @@ func (n *MemScanNode) Next() Tuple {
 		n.currIdx++
 
 		r := buildTuple(t)
-		r = ExecProject(r, n.Proj)
 
-		if n.Qual != nil {
-			if !n.Qual.matches(r) {
+		if n.Expr != nil {
+			if !n.Expr.Exec(r) {
 				continue
 			}
 		}
+
+		r = n.Proj.Exec(r)
 
 		return r
 	}

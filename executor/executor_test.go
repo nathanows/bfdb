@@ -150,6 +150,18 @@ func TestQueries(t *testing.T) {
 			},
 		},
 		{
+			queryEqv:       `SELECT id, name FROM movies`,
+			expectedTuples: len(inMemMovies),
+			expectedCols:   []string{"id", "name"},
+			queryTree: &executor.MemScanNode{
+				Src: inMemMovies,
+				Proj: executor.Projection{
+					{"id", ""},
+					{"name", ""},
+				},
+			},
+		},
+		{
 			queryEqv:       `SELECT name AS movie_name FROM movies`,
 			expectedTuples: len(inMemMovies),
 			expectedCols:   []string{"movie_name"},
@@ -347,6 +359,25 @@ func TestQueries(t *testing.T) {
 								Value: 4,
 							},
 						},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT distinct genre FROM movies`,
+			expectedTuples: 4,
+			expectedResult: []executor.Tuple{
+				map[string]interface{}{"genre": "western"},
+				map[string]interface{}{"genre": "animated"},
+				map[string]interface{}{"genre": "sci-fi"},
+				map[string]interface{}{"genre": "drama"},
+			},
+			queryTree: &executor.UniqNode{
+				Field: "genre",
+				Child: &executor.MemScanNode{
+					Src: inMemMovies,
+					Proj: executor.Projection{
+						{"genre", ""},
 					},
 				},
 			},

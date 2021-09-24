@@ -1,8 +1,13 @@
 package qexec
 
+import (
+	"github.com/fatih/structs"
+)
+
 type MemScanNode struct {
-	Src  []Tuple
+	Src  []interface{}
 	Qual *Qualifier
+	Proj Projection
 
 	currIdx int
 }
@@ -17,14 +22,26 @@ func (n *MemScanNode) Next() Tuple {
 
 		n.currIdx++
 
+		r := buildTuple(t)
+		r = ExecProject(r, n.Proj)
+
 		if n.Qual != nil {
-			if !n.Qual.matches(t) {
+			if !n.Qual.matches(r) {
 				continue
 			}
 		}
 
-		return t
+		return r
 	}
 
 	return nil
+}
+
+func buildTuple(t interface{}) Tuple {
+	base := structs.Map(t)
+	result := Tuple{}
+	for k, v := range base {
+		result[ToSnakeCase(k)] = v
+	}
+	return result
 }

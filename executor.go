@@ -5,6 +5,8 @@ type QueryDesc struct {
 	Dest     chan Tuple
 }
 
+type Tuple map[string]interface{}
+
 type PlanNode interface {
 	Next() Tuple
 }

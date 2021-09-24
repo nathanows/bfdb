@@ -1,7 +1,7 @@
 package qexec
 
 import (
-	"reflect"
+	"log"
 	"sort"
 )
 
@@ -39,21 +39,19 @@ func (n *SortNode) Next() Tuple {
 			n.res = append(n.res, tup)
 		}
 
-		fieldType := reflect.Indirect(reflect.ValueOf(n.res[0])).FieldByName(n.Field).Kind()
+		if len(n.res) == 0 {
+			return nil
+		}
 
 		sort.Slice(n.res, func(i, j int) bool {
-			v1 := reflect.Indirect(reflect.ValueOf(n.res[i])).FieldByName(n.Field)
-			v2 := reflect.Indirect(reflect.ValueOf(n.res[j])).FieldByName(n.Field)
-
-			ret := false
-
-			switch fieldType {
-			case reflect.Int64:
-				ret = int64(v1.Int()) < int64(v2.Int())
-			case reflect.Float64:
-				ret = float64(v1.Float()) < float64(v2.Float())
-			case reflect.String:
-				ret = string(v1.String()) < string(v2.String())
+			var ret bool
+			switch n.res[i][n.Field].(type) {
+			case string:
+				ret = n.res[i][n.Field].(string) < n.res[j][n.Field].(string)
+			case int:
+				ret = n.res[i][n.Field].(int) < n.res[j][n.Field].(int)
+			default:
+				log.Fatal("unsupported type")
 			}
 
 			if n.Dir == SortDesc {

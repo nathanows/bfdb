@@ -1,7 +1,6 @@
 package qexec_test
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -10,23 +9,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var inMemMovies = []qexec.Tuple{
-	&Movie{1, "Cool Hand Luke", "western"},
-	&Movie{2, "Peter Pan", "animated"},
-	&Movie{3, "Lord of the Rings", "sci-fi"},
-	&Movie{4, "Star Wars", "sci-fi"},
-	&Movie{5, "Good Will Hunting", "drama"},
-	&Movie{6, "Alien", "sci-fi"},
+var inMemMovies = []interface{}{
+	Movie{1, "Cool Hand Luke", "western", 4, 4.25},
+	Movie{2, "Peter Pan", "animated", 2, 1.75},
+	Movie{3, "Lord of the Rings", "sci-fi", 5, 4.5},
+	Movie{4, "Star Wars", "sci-fi", 4, 4.25},
+	Movie{5, "Good Will Hunting", "drama", 4, 3.75},
+	Movie{6, "Alien", "sci-fi", 3, 3.0},
 }
+
+var allAttrs = []string{"id", "name", "genre", "avg_rating", "avg_rating_f"}
 
 type Movie struct {
-	id    int64
-	name  string
-	genre string
-}
-
-func (m *Movie) String() string {
-	return fmt.Sprintf("%d,%s,%s", m.id, m.name, m.genre)
+	ID         int
+	Name       string
+	Genre      string
+	AvgRating  int
+	AvgRatingF float64
 }
 
 func TestQueries(t *testing.T) {
@@ -34,13 +33,14 @@ func TestQueries(t *testing.T) {
 		queryEqv           string
 		expectedTuples     int
 		expectedCols       []string
-		expectedResIDOrder []int64 // expected ID set in order, if empty, not checked
+		expectedResIDOrder []int // expected ID set in order, if empty, not checked
+		expectedResult     []qexec.Tuple
 		queryTree          qexec.PlanNode
 	}{
 		{
 			queryEqv:       `SELECT * FROM movies`,
 			expectedTuples: len(inMemMovies),
-			expectedCols:   []string{"id", "name", "genre"},
+			expectedCols:   allAttrs,
 			queryTree: &qexec.MemScanNode{
 				Src: inMemMovies,
 			},
@@ -48,7 +48,7 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT * FROM movies LIMIT 3`,
 			expectedTuples: 3,
-			expectedCols:   []string{"id", "name", "genre"},
+			expectedCols:   allAttrs,
 			queryTree: &qexec.LimitNode{
 				Limit: 3,
 				Child: &qexec.MemScanNode{
@@ -59,20 +59,20 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT * FROM movies WHERE id = 3`,
 			expectedTuples: 1,
-			expectedCols:   []string{"id", "name", "genre"},
+			expectedCols:   allAttrs,
 			queryTree: &qexec.MemScanNode{
 				Src: inMemMovies,
 				Qual: &qexec.Qualifier{
 					Field: "id",
 					Type:  qexec.QualEql,
-					Value: "3",
+					Value: 3,
 				},
 			},
 		},
 		{
 			queryEqv:       `SELECT * FROM movies WHERE genre = "sci-fi" LIMIT 2`,
 			expectedTuples: 2,
-			expectedCols:   []string{"id", "name", "genre"},
+			expectedCols:   allAttrs,
 			queryTree: &qexec.LimitNode{
 				Limit: 2,
 				Child: &qexec.MemScanNode{
@@ -88,8 +88,8 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:           `SELECT * FROM movies ORDER BY name`,
 			expectedTuples:     len(inMemMovies),
-			expectedCols:       []string{"id", "name", "genre"},
-			expectedResIDOrder: []int64{6, 1, 5, 3, 2, 4},
+			expectedCols:       allAttrs,
+			expectedResIDOrder: []int{6, 1, 5, 3, 2, 4},
 			queryTree: &qexec.SortNode{
 				Field: "name",
 				Dir:   qexec.SortAsc,
@@ -101,8 +101,8 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:           `SELECT * FROM movies ORDER BY name desc`,
 			expectedTuples:     len(inMemMovies),
-			expectedCols:       []string{"id", "name", "genre"},
-			expectedResIDOrder: []int64{4, 2, 3, 5, 1, 6},
+			expectedCols:       allAttrs,
+			expectedResIDOrder: []int{4, 2, 3, 5, 1, 6},
 			queryTree: &qexec.SortNode{
 				Field: "name",
 				Dir:   qexec.SortDesc,
@@ -114,8 +114,8 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:           `SELECT * FROM movies WHERE genre = "sci-fi" ORDER BY name LIMIT 2`,
 			expectedTuples:     2,
-			expectedCols:       []string{"id", "name", "genre"},
-			expectedResIDOrder: []int64{6, 3},
+			expectedCols:       allAttrs,
+			expectedResIDOrder: []int{6, 3},
 			queryTree: &qexec.LimitNode{
 				Limit: 2,
 				Child: &qexec.SortNode{
@@ -128,6 +128,115 @@ func TestQueries(t *testing.T) {
 							Type:  qexec.QualEql,
 							Value: "sci-fi",
 						},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT name FROM movies`,
+			expectedTuples: len(inMemMovies),
+			expectedCols:   []string{"name"},
+			queryTree: &qexec.MemScanNode{
+				Src: inMemMovies,
+				Proj: qexec.Projection{
+					{"name", ""},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT name AS movie_name FROM movies`,
+			expectedTuples: len(inMemMovies),
+			expectedCols:   []string{"movie_name"},
+			queryTree: &qexec.MemScanNode{
+				Src: inMemMovies,
+				Proj: qexec.Projection{
+					{"name", "movie_name"},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT sum(avg_rating) FROM movies`,
+			expectedTuples: 1,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"sum(avg_rating)": 22},
+			},
+			queryTree: &qexec.AggNode{
+				Type:  qexec.AggSum,
+				Field: "avg_rating",
+				Child: &qexec.MemScanNode{
+					Src: inMemMovies,
+					Proj: qexec.Projection{
+						{"avg_rating", ""},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT sum(avg_rating) AS total FROM movies`,
+			expectedTuples: 1,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"total": 22},
+			},
+			queryTree: &qexec.AggNode{
+				Type:  qexec.AggSum,
+				Field: "avg_rating",
+				Proj: qexec.Projection{
+					{"sum(avg_rating)", "total"},
+				},
+				Child: &qexec.MemScanNode{
+					Src: inMemMovies,
+					Proj: qexec.Projection{
+						{"avg_rating", ""},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT sum(avg_rating_f) FROM movies`,
+			expectedTuples: 1,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"sum(avg_rating_f)": 21.5},
+			},
+			queryTree: &qexec.AggNode{
+				Type:  qexec.AggSum,
+				Field: "avg_rating_f",
+				Child: &qexec.MemScanNode{
+					Src: inMemMovies,
+					Proj: qexec.Projection{
+						{"avg_rating_f", ""},
+					},
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT count(id) FROM movies`,
+			expectedTuples: 1,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"count(id)": len(inMemMovies)},
+			},
+			queryTree: &qexec.AggNode{
+				Type:  qexec.AggCount,
+				Field: "id",
+				Child: &qexec.MemScanNode{
+					Src: inMemMovies,
+				},
+			},
+		},
+		{
+			queryEqv:       `SELECT count(id) FROM movies WHERE genre = 'sci-fi'`,
+			expectedTuples: 1,
+			expectedResult: []qexec.Tuple{
+				map[string]interface{}{"count(id)": 3},
+			},
+			queryTree: &qexec.AggNode{
+				Type:  qexec.AggCount,
+				Field: "id",
+				Child: &qexec.MemScanNode{
+					Src: inMemMovies,
+					Qual: &qexec.Qualifier{
+						Field: "genre",
+						Type:  qexec.QualEql,
+						Value: "sci-fi",
 					},
 				},
 			},
@@ -151,35 +260,30 @@ func TestQueries(t *testing.T) {
 
 			assert.Len(t, results, tt.expectedTuples, "wrong # of tuples returned")
 
-			if len(results) > 0 {
-				rAttrs := resultAttributes(results[0])
-				assert.Len(t, rAttrs, len(tt.expectedCols), "wrong # of attributes returned")
-
-				assert.True(t, reflect.DeepEqual(rAttrs, tt.expectedCols), "wrong attributes returned")
-
-				if len(tt.expectedResIDOrder) > 0 {
-					ids := pluckIDs(results)
-					assert.True(t, reflect.DeepEqual(ids, tt.expectedResIDOrder), "ids returned in wrong order")
+			if len(tt.expectedCols) > 0 {
+				returnedCols := []string{}
+				for k := range results[0] {
+					returnedCols = append(returnedCols, k)
 				}
+				assert.ElementsMatch(t, tt.expectedCols, returnedCols, "wrong attributes returned")
+			}
+
+			if len(tt.expectedResIDOrder) > 0 {
+				ids := pluckIDs(results)
+				assert.True(t, reflect.DeepEqual(ids, tt.expectedResIDOrder), "ids returned in wrong order")
+			}
+
+			if len(tt.expectedResult) > 0 {
+				assert.ElementsMatch(t, tt.expectedResult, results, "incorrect results")
 			}
 		})
 	}
 }
 
-func resultAttributes(t qexec.Tuple) []string {
-	names := []string{}
-	val := reflect.ValueOf(t).Elem()
-	for i := 0; i < val.NumField(); i++ {
-		names = append(names, val.Type().Field(i).Name)
-	}
-	return names
-}
-
-func pluckIDs(ts []qexec.Tuple) []int64 {
-	ids := []int64{}
+func pluckIDs(ts []qexec.Tuple) []int {
+	ids := []int{}
 	for _, t := range ts {
-		f := reflect.Indirect(reflect.ValueOf(t)).FieldByName("id")
-		ids = append(ids, f.Int())
+		ids = append(ids, t["id"].(int))
 	}
 	return ids
 }

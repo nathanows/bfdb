@@ -1,10 +1,16 @@
-package qexec
+package executor
 
 type ExpressionType int
 
 const (
 	ExprAnd ExpressionType = iota
-	ExprOr  ExpressionType = iota
+	ExprOr
+)
+
+type QualType int
+
+const (
+	QualEql QualType = iota
 )
 
 type Expression struct {
@@ -12,6 +18,12 @@ type Expression struct {
 	Qual  *Qualifier
 	Left  *Expression
 	Right *Expression
+}
+
+type Qualifier struct {
+	Field string
+	Type  QualType
+	Value interface{}
 }
 
 func (e *Expression) Exec(t Tuple) bool {
@@ -42,4 +54,13 @@ func (e *Expression) Exec(t Tuple) bool {
 	}
 
 	return false
+}
+
+func (q *Qualifier) matches(t Tuple) bool {
+	switch q.Type {
+	case QualEql:
+		return t[q.Field] == q.Value
+	default:
+		return false
+	}
 }

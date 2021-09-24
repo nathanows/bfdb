@@ -1,4 +1,4 @@
-package qexec
+package executor
 
 import (
 	"github.com/fatih/structs"

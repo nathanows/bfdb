@@ -1,4 +1,4 @@
-package qexec
+package executor
 
 type QueryDesc struct {
 	PlanHead PlanNode

@@ -1,10 +1,10 @@
-package qexec_test
+package executor_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/nathanows/qexec"
+	"github.com/nathanows/qexec/executor"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -34,14 +34,14 @@ func TestQueries(t *testing.T) {
 		expectedTuples     int
 		expectedCols       []string
 		expectedResIDOrder []int // expected ID set in order, if empty, not checked
-		expectedResult     []qexec.Tuple
-		queryTree          qexec.PlanNode
+		expectedResult     []executor.Tuple
+		queryTree          executor.PlanNode
 	}{
 		{
 			queryEqv:       `SELECT * FROM movies`,
 			expectedTuples: len(inMemMovies),
 			expectedCols:   allAttrs,
-			queryTree: &qexec.MemScanNode{
+			queryTree: &executor.MemScanNode{
 				Src: inMemMovies,
 			},
 		},
@@ -49,9 +49,9 @@ func TestQueries(t *testing.T) {
 			queryEqv:       `SELECT * FROM movies LIMIT 3`,
 			expectedTuples: 3,
 			expectedCols:   allAttrs,
-			queryTree: &qexec.LimitNode{
+			queryTree: &executor.LimitNode{
 				Limit: 3,
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
 				},
 			},
@@ -60,12 +60,12 @@ func TestQueries(t *testing.T) {
 			queryEqv:       `SELECT * FROM movies WHERE id = 3`,
 			expectedTuples: 1,
 			expectedCols:   allAttrs,
-			queryTree: &qexec.MemScanNode{
+			queryTree: &executor.MemScanNode{
 				Src: inMemMovies,
-				Expr: &qexec.Expression{
-					Qual: &qexec.Qualifier{
+				Expr: &executor.Expression{
+					Qual: &executor.Qualifier{
 						Field: "id",
-						Type:  qexec.QualEql,
+						Type:  executor.QualEql,
 						Value: 3,
 					},
 				},
@@ -75,14 +75,14 @@ func TestQueries(t *testing.T) {
 			queryEqv:       `SELECT * FROM movies WHERE genre = "sci-fi" LIMIT 2`,
 			expectedTuples: 2,
 			expectedCols:   allAttrs,
-			queryTree: &qexec.LimitNode{
+			queryTree: &executor.LimitNode{
 				Limit: 2,
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
-					Expr: &qexec.Expression{
-						Qual: &qexec.Qualifier{
+					Expr: &executor.Expression{
+						Qual: &executor.Qualifier{
 							Field: "genre",
-							Type:  qexec.QualEql,
+							Type:  executor.QualEql,
 							Value: "sci-fi",
 						},
 					},
@@ -94,10 +94,10 @@ func TestQueries(t *testing.T) {
 			expectedTuples:     len(inMemMovies),
 			expectedCols:       allAttrs,
 			expectedResIDOrder: []int{6, 1, 5, 3, 2, 4},
-			queryTree: &qexec.SortNode{
+			queryTree: &executor.SortNode{
 				Field: "name",
-				Dir:   qexec.SortAsc,
-				Child: &qexec.MemScanNode{
+				Dir:   executor.SortAsc,
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
 				},
 			},
@@ -107,10 +107,10 @@ func TestQueries(t *testing.T) {
 			expectedTuples:     len(inMemMovies),
 			expectedCols:       allAttrs,
 			expectedResIDOrder: []int{4, 2, 3, 5, 1, 6},
-			queryTree: &qexec.SortNode{
+			queryTree: &executor.SortNode{
 				Field: "name",
-				Dir:   qexec.SortDesc,
-				Child: &qexec.MemScanNode{
+				Dir:   executor.SortDesc,
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
 				},
 			},
@@ -120,17 +120,17 @@ func TestQueries(t *testing.T) {
 			expectedTuples:     2,
 			expectedCols:       allAttrs,
 			expectedResIDOrder: []int{6, 3},
-			queryTree: &qexec.LimitNode{
+			queryTree: &executor.LimitNode{
 				Limit: 2,
-				Child: &qexec.SortNode{
+				Child: &executor.SortNode{
 					Field: "name",
-					Dir:   qexec.SortAsc,
-					Child: &qexec.MemScanNode{
+					Dir:   executor.SortAsc,
+					Child: &executor.MemScanNode{
 						Src: inMemMovies,
-						Expr: &qexec.Expression{
-							Qual: &qexec.Qualifier{
+						Expr: &executor.Expression{
+							Qual: &executor.Qualifier{
 								Field: "genre",
-								Type:  qexec.QualEql,
+								Type:  executor.QualEql,
 								Value: "sci-fi",
 							},
 						},
@@ -142,9 +142,9 @@ func TestQueries(t *testing.T) {
 			queryEqv:       `SELECT name FROM movies`,
 			expectedTuples: len(inMemMovies),
 			expectedCols:   []string{"name"},
-			queryTree: &qexec.MemScanNode{
+			queryTree: &executor.MemScanNode{
 				Src: inMemMovies,
-				Proj: qexec.Projection{
+				Proj: executor.Projection{
 					{"name", ""},
 				},
 			},
@@ -153,9 +153,9 @@ func TestQueries(t *testing.T) {
 			queryEqv:       `SELECT name AS movie_name FROM movies`,
 			expectedTuples: len(inMemMovies),
 			expectedCols:   []string{"movie_name"},
-			queryTree: &qexec.MemScanNode{
+			queryTree: &executor.MemScanNode{
 				Src: inMemMovies,
-				Proj: qexec.Projection{
+				Proj: executor.Projection{
 					{"name", "movie_name"},
 				},
 			},
@@ -163,15 +163,15 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT sum(avg_rating) FROM movies`,
 			expectedTuples: 1,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"sum(avg_rating)": 22},
 			},
-			queryTree: &qexec.AggNode{
-				Type:  qexec.AggSum,
+			queryTree: &executor.AggNode{
+				Type:  executor.AggSum,
 				Field: "avg_rating",
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
-					Proj: qexec.Projection{
+					Proj: executor.Projection{
 						{"avg_rating", ""},
 					},
 				},
@@ -180,18 +180,18 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT sum(avg_rating) AS total FROM movies`,
 			expectedTuples: 1,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"total": 22},
 			},
-			queryTree: &qexec.AggNode{
-				Type:  qexec.AggSum,
+			queryTree: &executor.AggNode{
+				Type:  executor.AggSum,
 				Field: "avg_rating",
-				Proj: qexec.Projection{
+				Proj: executor.Projection{
 					{"sum(avg_rating)", "total"},
 				},
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
-					Proj: qexec.Projection{
+					Proj: executor.Projection{
 						{"avg_rating", ""},
 					},
 				},
@@ -200,15 +200,15 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT sum(avg_rating_f) FROM movies`,
 			expectedTuples: 1,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"sum(avg_rating_f)": 21.5},
 			},
-			queryTree: &qexec.AggNode{
-				Type:  qexec.AggSum,
+			queryTree: &executor.AggNode{
+				Type:  executor.AggSum,
 				Field: "avg_rating_f",
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
-					Proj: qexec.Projection{
+					Proj: executor.Projection{
 						{"avg_rating_f", ""},
 					},
 				},
@@ -217,13 +217,13 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT count(id) FROM movies`,
 			expectedTuples: 1,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"count(id)": len(inMemMovies)},
 			},
-			queryTree: &qexec.AggNode{
-				Type:  qexec.AggCount,
+			queryTree: &executor.AggNode{
+				Type:  executor.AggCount,
 				Field: "id",
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
 				},
 			},
@@ -231,18 +231,18 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT count(id) FROM movies WHERE genre = 'sci-fi'`,
 			expectedTuples: 1,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"count(id)": 3},
 			},
-			queryTree: &qexec.AggNode{
-				Type:  qexec.AggCount,
+			queryTree: &executor.AggNode{
+				Type:  executor.AggCount,
 				Field: "id",
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
-					Expr: &qexec.Expression{
-						Qual: &qexec.Qualifier{
+					Expr: &executor.Expression{
+						Qual: &executor.Qualifier{
 							Field: "genre",
-							Type:  qexec.QualEql,
+							Type:  executor.QualEql,
 							Value: "sci-fi",
 						},
 					},
@@ -252,27 +252,27 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT name FROM movies WHERE genre = 'sci-fi' AND id = 6`,
 			expectedTuples: 1,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"name": "Alien"},
 			},
-			queryTree: &qexec.MemScanNode{
+			queryTree: &executor.MemScanNode{
 				Src: inMemMovies,
-				Proj: qexec.Projection{
+				Proj: executor.Projection{
 					{"name", ""},
 				},
-				Expr: &qexec.Expression{
-					Type: qexec.ExprAnd,
-					Left: &qexec.Expression{
-						Qual: &qexec.Qualifier{
+				Expr: &executor.Expression{
+					Type: executor.ExprAnd,
+					Left: &executor.Expression{
+						Qual: &executor.Qualifier{
 							Field: "genre",
-							Type:  qexec.QualEql,
+							Type:  executor.QualEql,
 							Value: "sci-fi",
 						},
 					},
-					Right: &qexec.Expression{
-						Qual: &qexec.Qualifier{
+					Right: &executor.Expression{
+						Qual: &executor.Qualifier{
 							Field: "id",
-							Type:  qexec.QualEql,
+							Type:  executor.QualEql,
 							Value: 6,
 						},
 					},
@@ -282,27 +282,27 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT count(id) FROM movies WHERE genre = 'sci-fi' OR genre = 'western'`,
 			expectedTuples: 1,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"count(id)": 4},
 			},
-			queryTree: &qexec.AggNode{
-				Type:  qexec.AggCount,
+			queryTree: &executor.AggNode{
+				Type:  executor.AggCount,
 				Field: "id",
-				Child: &qexec.MemScanNode{
+				Child: &executor.MemScanNode{
 					Src: inMemMovies,
-					Expr: &qexec.Expression{
-						Type: qexec.ExprOr,
-						Left: &qexec.Expression{
-							Qual: &qexec.Qualifier{
+					Expr: &executor.Expression{
+						Type: executor.ExprOr,
+						Left: &executor.Expression{
+							Qual: &executor.Qualifier{
 								Field: "genre",
-								Type:  qexec.QualEql,
+								Type:  executor.QualEql,
 								Value: "sci-fi",
 							},
 						},
-						Right: &qexec.Expression{
-							Qual: &qexec.Qualifier{
+						Right: &executor.Expression{
+							Qual: &executor.Qualifier{
 								Field: "genre",
-								Type:  qexec.QualEql,
+								Type:  executor.QualEql,
 								Value: "western",
 							},
 						},
@@ -313,37 +313,37 @@ func TestQueries(t *testing.T) {
 		{
 			queryEqv:       `SELECT name FROM movies WHERE id = 1 OR (genre = 'sci-fi' AND id = 4)`,
 			expectedTuples: 2,
-			expectedResult: []qexec.Tuple{
+			expectedResult: []executor.Tuple{
 				map[string]interface{}{"name": "Cool Hand Luke"},
 				map[string]interface{}{"name": "Star Wars"},
 			},
-			queryTree: &qexec.MemScanNode{
+			queryTree: &executor.MemScanNode{
 				Src: inMemMovies,
-				Proj: qexec.Projection{
+				Proj: executor.Projection{
 					{"name", ""},
 				},
-				Expr: &qexec.Expression{
-					Type: qexec.ExprOr,
-					Left: &qexec.Expression{
-						Qual: &qexec.Qualifier{
+				Expr: &executor.Expression{
+					Type: executor.ExprOr,
+					Left: &executor.Expression{
+						Qual: &executor.Qualifier{
 							Field: "id",
-							Type:  qexec.QualEql,
+							Type:  executor.QualEql,
 							Value: 1,
 						},
 					},
-					Right: &qexec.Expression{
-						Type: qexec.ExprAnd,
-						Left: &qexec.Expression{
-							Qual: &qexec.Qualifier{
+					Right: &executor.Expression{
+						Type: executor.ExprAnd,
+						Left: &executor.Expression{
+							Qual: &executor.Qualifier{
 								Field: "genre",
-								Type:  qexec.QualEql,
+								Type:  executor.QualEql,
 								Value: "sci-fi",
 							},
 						},
-						Right: &qexec.Expression{
-							Qual: &qexec.Qualifier{
+						Right: &executor.Expression{
+							Qual: &executor.Qualifier{
 								Field: "id",
-								Type:  qexec.QualEql,
+								Type:  executor.QualEql,
 								Value: 4,
 							},
 						},
@@ -355,15 +355,15 @@ func TestQueries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.queryEqv, func(t *testing.T) {
-			resultCh := make(chan qexec.Tuple)
-			queryDesc := qexec.QueryDesc{
+			resultCh := make(chan executor.Tuple)
+			queryDesc := executor.QueryDesc{
 				PlanHead: tt.queryTree,
 				Dest:     resultCh,
 			}
 
-			go qexec.Run(queryDesc)
+			go executor.Run(queryDesc)
 
-			results := []qexec.Tuple{}
+			results := []executor.Tuple{}
 			for tup := range resultCh {
 				results = append(results, tup)
 			}
@@ -390,7 +390,7 @@ func TestQueries(t *testing.T) {
 	}
 }
 
-func pluckIDs(ts []qexec.Tuple) []int {
+func pluckIDs(ts []executor.Tuple) []int {
 	ids := []int{}
 	for _, t := range ts {
 		ids = append(ids, t["id"].(int))

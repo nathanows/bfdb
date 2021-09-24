@@ -1,4 +1,4 @@
-module github.com/nathanows/qexec
+module github.com/nathanows/bfdb
 
 go 1.15
 

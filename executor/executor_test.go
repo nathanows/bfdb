@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/nathanows/qexec/executor"
+	"github.com/nathanows/bfdb/executor"
 
 	"github.com/stretchr/testify/assert"
 )
